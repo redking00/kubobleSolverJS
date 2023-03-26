@@ -155,7 +155,8 @@ export class App {
                         this.showRunButton ? m('button#run', { onclick: this.solve }, 'Solve') : null
                     ],
                     this.showBoardEditor ? m('button#reset', { onclick: () => { this.onSizeChanged(this.boardSize); } }, 'Reset') : null,
-                    this.showOverlay ? m('div#overlay', m('div', 'Solving...')) : null
+                    this.showOverlay ? m('div#overlay', m('div', 'Solving...')) : null,
+                    m('p#footer', 'by dvt - 2023')
                 ]
             }
         });

@@ -87,6 +87,14 @@ p#legend>span {
     vertical-align: middle;
 }
 
+p#footer {
+    position: absolute;
+    bottom: 5px;
+    text-align: center;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
 div#overlay {
     position: fixed;
     top: 0;
