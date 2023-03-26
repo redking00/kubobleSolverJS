@@ -7,16 +7,28 @@ body {
     text-align: center;
 }
 
-h3{
+h3 {
     font-weight: bold;
     font-size: 2rem;
     margin: 2rem;
 }
 
+a {
+    text-decoration: underline;
+}
+
+h3#title {
+    margin-bottom: 0.7rem;
+}
+
+p#desc {
+    margin-bottom: 2rem;
+}
+
 h4 {
     font-weight: bold;
-    font-size: 1.2rem;    
-    margin: 1.2rem;
+    font-size: 1.2rem;
+    margin: 1.2rem 0 0 0;
 }
 
 select {
@@ -37,6 +49,14 @@ td {
     height: 50px;
     text-align: center;
     vertical-align: middle;
+    font-size: 2rem;
+    line-height: 1rem;
+}
+
+select,
+table#items td,
+button {
+    cursor: pointer;
 }
 
 button {
@@ -46,36 +66,42 @@ button {
     margin: 10px;
     min-width: 80px;
     font-weight: bold;
-    cursor:pointer;    
 }
 
 button:disabled {
-    cursor:default;
-}
-
-button#reset, button#run {
-    display:block;
-    margin: 30px auto;
+    cursor: default;
 }
 
 .selected {
     background-color: rgb(211, 211, 211);
 }
 
+p#legend {
+    margin-top: 10px;
+    line-height: 3rem;
+    font-size: 0.9rem;
+}
+
+p#legend>span {
+    font-size: 1.7rem;
+    vertical-align: middle;
+}
+
 div#overlay {
-    position:fixed;
-    top:0;
-    left:0;
-    right:0;
-    bottom:0;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     background-color: #ffffffb8;
 }
-#overlay > div {
-    display:inline;
-    position:absolute;
-    top:50%;
-    left:50%;
-    transform: translate(-50%,-50%);
+
+#overlay>div {
+    display: inline;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     font-weight: bold;
     font-size: 1.5rem;
 }

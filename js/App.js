@@ -23,54 +23,62 @@ class BoardEditor {
                 const targetIndex = vnode.attrs.boardState.targets.indexOf(index);
                 let symbol = '';
                 if (isObstacle)
-                    symbol = 'X';
+                    symbol = '⬛';
                 else {
-                    symbol = stoneIndex >= 0 ? `${stoneIndex + 1}` : symbol;
-                    symbol = targetIndex >= 0 ? `${symbol}T${targetIndex + 1}` : symbol;
+                    symbol = stoneIndex >= 0 ? `&#${9312 + stoneIndex};` : symbol;
+                    symbol = targetIndex >= 0 ? `${symbol}&#${9461 + targetIndex};` : symbol;
                 }
                 return m('td', {
                     onclick: () => {
-                        let newstate = JSON.parse(JSON.stringify(vnode.attrs.boardState));
-                        let changed = false;
-                        if (this.selectedItem?.obstacle) {
-                            if (!vnode.attrs.boardState.obstacles.includes(index) && !vnode.attrs.boardState.stones.includes(index) && !vnode.attrs.boardState.targets.includes(index)) {
-                                newstate.obstacles.push(index);
-                                changed = true;
+                        if (this.selectedItem) {
+                            let newstate = JSON.parse(JSON.stringify(vnode.attrs.boardState));
+                            let changed = false;
+                            if (this.selectedItem.obstacle) {
+                                if (!vnode.attrs.boardState.obstacles.includes(index) && !vnode.attrs.boardState.stones.includes(index) && !vnode.attrs.boardState.targets.includes(index)) {
+                                    newstate.obstacles.push(index);
+                                    changed = true;
+                                }
                             }
-                        }
-                        else if (this.selectedItem?.stoneIndex !== null) {
-                            if (!vnode.attrs.boardState.obstacles.includes(index) && !vnode.attrs.boardState.stones.includes(index)) {
-                                newstate.stones[this.selectedItem.stoneIndex] = index;
-                                changed = true;
+                            else if (this.selectedItem.stoneIndex !== null) {
+                                if (!vnode.attrs.boardState.obstacles.includes(index) && !vnode.attrs.boardState.stones.includes(index)) {
+                                    newstate.stones[this.selectedItem.stoneIndex] = index;
+                                    changed = true;
+                                }
                             }
-                        }
-                        else if (this.selectedItem?.targetIndex !== null) {
-                            if (!vnode.attrs.boardState.obstacles.includes(index) && !vnode.attrs.boardState.targets.includes(index)) {
-                                newstate.targets[this.selectedItem.targetIndex] = index;
-                                changed = true;
+                            else if (this.selectedItem.targetIndex !== null) {
+                                if (!vnode.attrs.boardState.obstacles.includes(index) && !vnode.attrs.boardState.targets.includes(index)) {
+                                    newstate.targets[this.selectedItem.targetIndex] = index;
+                                    changed = true;
+                                }
                             }
-                        }
-                        if (changed) {
-                            vnode.attrs.onStateChanged(newstate);
-                            this.selectedItem = null;
+                            if (changed) {
+                                vnode.attrs.onStateChanged(newstate);
+                                this.selectedItem = null;
+                            }
                         }
                     }
-                }, symbol);
+                }, m.trust(symbol));
             })))),
-            m('table', m('tr', [
+            m('table#items', m('tr', [
                 m('td', {
                     className: this.selectedItem?.obstacle ? 'selected' : '',
                     onclick: () => { this.selectedItem = { obstacle: true, stoneIndex: null, targetIndex: null }; }
-                }, 'X'),
+                }, '⬛'),
                 ...vnode.attrs.boardState.stones.map((s, n) => s === null ? m('td', {
                     className: this.selectedItem?.stoneIndex === n ? 'selected' : '',
                     onclick: () => { this.selectedItem = { obstacle: false, stoneIndex: n, targetIndex: null }; }
-                }, `${n + 1}`) : null),
+                }, m.trust(`&#${9312 + n};`)) : null),
                 ...vnode.attrs.boardState.targets.map((t, n) => t === null ? m('td', {
                     className: this.selectedItem?.targetIndex === n ? 'selected' : '',
                     onclick: () => { this.selectedItem = { obstacle: false, stoneIndex: null, targetIndex: n }; }
-                }, `T${n + 1}`) : null)
-            ]))
+                }, m.trust(`&#${9461 + n};`)) : null)
+            ])),
+            m('p#legend', [
+                'legend: ',
+                m('span', '⬛'), ' wall | ',
+                m('span', m.trust('&#9312')), ' stone | ',
+                m('span', m.trust('&#9461')), ' target'
+            ])
         ];
     }
 }
@@ -83,7 +91,7 @@ class SolutionPlayer {
                 const index = j * vnode.attrs.boardSize.xsize + i;
                 let isObstacle = vnode.attrs.obstacles.includes(index);
                 let stoneIndex = vnode.attrs.solution.steps[this.currentStep].indexOf(index);
-                return m('td', isObstacle ? 'X' : (stoneIndex >= 0 ? `${stoneIndex + 1}` : ''));
+                return m('td', m.trust(isObstacle ? '⬛' : (stoneIndex >= 0 ? `&#${9312 + stoneIndex};` : '')));
             })))),
             m('h4', `Step ${this.currentStep} of ${vnode.attrs.solution.steps.length - 1}`),
             m('button', { disabled: this.currentStep === 0, onclick: () => { this.currentStep--; } }, 'Prev'),
@@ -116,7 +124,7 @@ export class App {
         this.showRunButton = !this.boardState.stones.includes(null) && !this.boardState.targets.includes(null);
         this.solution = null;
     };
-    resolve = () => {
+    solve = () => {
         let params = {
             xsize: this.boardSize.xsize,
             ysize: this.boardSize.ysize,
@@ -139,14 +147,15 @@ export class App {
         m.route(document.body, '/', {
             '/': {
                 render: () => [
-                    m('h3', 'KubobleSolverJS'),
+                    m('h3#title', 'KubobleSolverJS'),
+                    m('p#desc', ['A solver for ', m('a', { href: 'https://kuboble.com/', target: '_blank' }, 'https://kuboble.com/')]),
                     this.solution ? m(SolutionPlayer, { boardSize: this.boardSize, obstacles: this.boardState.obstacles, solution: this.solution }) : [
                         m(BoardSizeEditor, { boardSize: this.boardSize, onSizeChanged: this.onSizeChanged }),
                         this.showBoardEditor ? m(BoardEditor, { boardSize: this.boardSize, boardState: this.boardState, onStateChanged: this.onStateChanged }) : null,
-                        this.showRunButton ? m('button#run', { onclick: this.resolve }, 'Resolve') : null
+                        this.showRunButton ? m('button#run', { onclick: this.solve }, 'Solve') : null
                     ],
                     this.showBoardEditor ? m('button#reset', { onclick: () => { this.onSizeChanged(this.boardSize); } }, 'Reset') : null,
-                    this.showOverlay ? m('div#overlay', m('div', 'Resolving...')) : null
+                    this.showOverlay ? m('div#overlay', m('div', 'Solving...')) : null
                 ]
             }
         });
