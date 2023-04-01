@@ -21,6 +21,9 @@ class BoardEditor {
                 const isObstacle = vnode.attrs.boardState.obstacles.includes(index);
                 const stoneIndex = vnode.attrs.boardState.stones.indexOf(index);
                 const targetIndex = vnode.attrs.boardState.targets.indexOf(index);
+                const isLive = this.selectedItem && !isObstacle && ((this.selectedItem.obstacle && stoneIndex < 0 && targetIndex < 0) ||
+                    (this.selectedItem.stoneIndex !== null && stoneIndex < 0) ||
+                    (this.selectedItem.targetIndex !== null && targetIndex < 0));
                 let symbol = '';
                 if (isObstacle)
                     symbol = '⬛';
@@ -29,8 +32,9 @@ class BoardEditor {
                     symbol = targetIndex >= 0 ? `${symbol}&#${9461 + targetIndex};` : symbol;
                 }
                 return m('td', {
+                    class: isLive ? 'live' : '',
                     onclick: () => {
-                        if (this.selectedItem) {
+                        if (isLive) {
                             let newstate = JSON.parse(JSON.stringify(vnode.attrs.boardState));
                             let changed = false;
                             if (this.selectedItem.obstacle) {
@@ -94,8 +98,10 @@ class SolutionPlayer {
                 return m('td', m.trust(isObstacle ? '⬛' : (stoneIndex >= 0 ? `&#${9312 + stoneIndex};` : '')));
             })))),
             m('h4', `Step ${this.currentStep} of ${vnode.attrs.solution.steps.length - 1}`),
-            m('button', { disabled: this.currentStep === 0, onclick: () => { this.currentStep--; } }, 'Prev'),
-            m('button', { disabled: this.currentStep === vnode.attrs.solution.steps.length - 1, onclick: () => { this.currentStep++; } }, 'Next')
+            m('p', [
+                m('button', { disabled: this.currentStep === 0, onclick: () => { this.currentStep--; } }, 'Prev'),
+                m('button', { disabled: this.currentStep === vnode.attrs.solution.steps.length - 1, onclick: () => { this.currentStep++; } }, 'Next')
+            ])
         ];
     }
 }
@@ -107,6 +113,7 @@ export class App {
     showRunButton = false;
     showOverlay = false;
     solution = null;
+    stateHistory = [];
     kworker = new Worker('js/kubobleWorker.js');
     onSizeChanged = (boardSize) => {
         this.boardSize = boardSize;
@@ -118,9 +125,16 @@ export class App {
         this.showBoardEditor = !!this.boardSize.xsize && !!this.boardSize.ysize && !!this.boardSize.stoneCount;
         this.showRunButton = false;
         this.solution = null;
+        this.stateHistory = [];
     };
     onStateChanged = (boardState) => {
+        this.stateHistory.unshift(JSON.parse(JSON.stringify(this.boardState)));
         this.boardState = boardState;
+        this.showRunButton = !this.boardState.stones.includes(null) && !this.boardState.targets.includes(null);
+        this.solution = null;
+    };
+    onUndo = () => {
+        this.boardState = this.stateHistory.shift();
         this.showRunButton = !this.boardState.stones.includes(null) && !this.boardState.targets.includes(null);
         this.solution = null;
     };
@@ -151,10 +165,13 @@ export class App {
                     m('p#desc', ['A solver for ', m('a', { href: 'https://kuboble.com/', target: '_blank' }, 'https://kuboble.com/')]),
                     this.solution ? m(SolutionPlayer, { boardSize: this.boardSize, obstacles: this.boardState.obstacles, solution: this.solution }) : [
                         m(BoardSizeEditor, { boardSize: this.boardSize, onSizeChanged: this.onSizeChanged }),
-                        this.showBoardEditor ? m(BoardEditor, { boardSize: this.boardSize, boardState: this.boardState, onStateChanged: this.onStateChanged }) : null,
-                        this.showRunButton ? m('button#run', { onclick: this.solve }, 'Solve') : null
+                        this.showBoardEditor ? m(BoardEditor, { boardSize: this.boardSize, boardState: this.boardState, onStateChanged: this.onStateChanged }) : null
                     ],
-                    this.showBoardEditor ? m('button#reset', { onclick: () => { this.onSizeChanged(this.boardSize); } }, 'Reset') : null,
+                    this.showBoardEditor && this.stateHistory.length > 0 ? [
+                        m('button#reset', { onclick: () => { this.onSizeChanged(this.boardSize); } }, 'Reset'),
+                        m('button#undo', { onclick: this.onUndo }, 'Undo'),
+                    ] : null,
+                    this.solution === null && this.showRunButton ? m('button#run', { onclick: this.solve }, 'Solve') : null,
                     this.showOverlay ? m('div#overlay', m('div', 'Solving...')) : null,
                     m('p#footer', 'by dvt - 2023')
                 ]
