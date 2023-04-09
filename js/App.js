@@ -1,4 +1,15 @@
 import m from './ui-base.js';
+class LevelSelector {
+    view(vnode) {
+        return [
+            m('label', { for: 'level' }, 'Level'),
+            m('select', {
+                id: 'level',
+                onchange: (e) => vnode.attrs.onLevelChanged(parseInt(e.target.value))
+            }, m('option', { selected: vnode.attrs.selectedLevel === null, hidden: true, disabled: true }, 'Select'), m('option', { selected: vnode.attrs.selectedLevel === 0, value: 0 }, 'Custom'), ...Array(vnode.attrs.nLevels).fill(0).map((_, l) => m('option', { selected: vnode.attrs.selectedLevel === l + 1, value: l + 1 }, `${l + 1}`)))
+        ];
+    }
+}
 class BoardSizeEditor {
     view(vnode) {
         const sizes = [3, 4, 5, 6];
@@ -87,20 +98,19 @@ class BoardEditor {
     }
 }
 class SolutionPlayer {
-    currentStep = 0;
     view(vnode) {
         return [
             m('h4', 'Solution'),
             m('table', [...Array(vnode.attrs.boardSize.ysize).keys()].map(j => m('tr', [...Array(vnode.attrs.boardSize.xsize).keys()].map(i => {
                 const index = j * vnode.attrs.boardSize.xsize + i;
                 let isObstacle = vnode.attrs.obstacles.includes(index);
-                let stoneIndex = vnode.attrs.solution.steps[this.currentStep].indexOf(index);
+                let stoneIndex = vnode.attrs.solution.steps[vnode.attrs.currentStep].indexOf(index);
                 return m('td', m.trust(isObstacle ? '⬛' : (stoneIndex >= 0 ? `&#${9312 + stoneIndex};` : '')));
             })))),
-            m('h4', `Step ${this.currentStep} of ${vnode.attrs.solution.steps.length - 1}`),
+            m('h4', `Step ${vnode.attrs.currentStep} of ${vnode.attrs.solution.steps.length - 1}`),
             m('p', [
-                m('button', { disabled: this.currentStep === 0, onclick: () => { this.currentStep--; } }, 'Prev'),
-                m('button', { disabled: this.currentStep === vnode.attrs.solution.steps.length - 1, onclick: () => { this.currentStep++; } }, 'Next')
+                m('button', { disabled: vnode.attrs.currentStep === 0, onclick: vnode.attrs.onPrevStep }, 'Prev'),
+                m('button', { disabled: vnode.attrs.currentStep === vnode.attrs.solution.steps.length - 1, onclick: vnode.attrs.onNextStep }, 'Next')
             ])
         ];
     }
@@ -113,8 +123,33 @@ export class App {
     showRunButton = false;
     showOverlay = false;
     solution = null;
+    currentStep = 0;
     stateHistory = [];
+    levels = [];
+    selectedLevel = null;
     kworker = new Worker('js/kubobleWorker.js');
+    onLevelChanged = (level) => {
+        this.selectedLevel = level;
+        if (this.selectedLevel > 0) {
+            this.onSizeChanged({
+                xsize: this.levels[this.selectedLevel - 1].x,
+                ysize: this.levels[this.selectedLevel - 1].y,
+                stoneCount: this.levels[this.selectedLevel - 1].n
+            });
+            this.onStateChanged({
+                stones: this.levels[this.selectedLevel - 1].s,
+                targets: this.levels[this.selectedLevel - 1].t,
+                obstacles: this.levels[this.selectedLevel - 1].o,
+            });
+            this.stateHistory = [];
+            this.solve();
+        }
+        else {
+            this.onSizeChanged({ xsize: null, ysize: null, stoneCount: null });
+            this.onStateChanged({ stones: [], targets: [], obstacles: [] });
+            this.stateHistory = [];
+        }
+    };
     onSizeChanged = (boardSize) => {
         this.boardSize = boardSize;
         this.boardState = {
@@ -125,18 +160,21 @@ export class App {
         this.showBoardEditor = !!this.boardSize.xsize && !!this.boardSize.ysize && !!this.boardSize.stoneCount;
         this.showRunButton = false;
         this.solution = null;
+        this.currentStep = 0;
         this.stateHistory = [];
     };
     onStateChanged = (boardState) => {
         this.stateHistory.unshift(JSON.parse(JSON.stringify(this.boardState)));
         this.boardState = boardState;
-        this.showRunButton = !this.boardState.stones.includes(null) && !this.boardState.targets.includes(null);
+        this.showRunButton = this.boardState.stones.length > 0 && this.boardState.targets.length > 0 && !this.boardState.stones.includes(null) && !this.boardState.targets.includes(null);
         this.solution = null;
+        this.currentStep = 0;
     };
     onUndo = () => {
         this.boardState = this.stateHistory.shift();
-        this.showRunButton = !this.boardState.stones.includes(null) && !this.boardState.targets.includes(null);
+        this.showRunButton = this.boardState.stones.length > 0 && this.boardState.targets.length > 0 && !this.boardState.stones.includes(null) && !this.boardState.targets.includes(null);
         this.solution = null;
+        this.currentStep = 0;
     };
     solve = () => {
         let params = {
@@ -150,6 +188,11 @@ export class App {
         this.showOverlay = true;
     };
     constructor() {
+        fetch('levels.json').then(res => res.json().then(levels => {
+            this.levels = levels;
+            console.log(this.levels);
+            m.redraw();
+        }));
         this.kworker.onmessage = (event) => {
             this.showOverlay = false;
             if (event.data.length)
@@ -163,15 +206,20 @@ export class App {
                 render: () => [
                     m('h3#title', 'KubobleSolverJS'),
                     m('p#desc', ['A solver for ', m('a', { href: 'https://kuboble.com/', target: '_blank' }, 'https://kuboble.com/')]),
-                    this.solution ? m(SolutionPlayer, { boardSize: this.boardSize, obstacles: this.boardState.obstacles, solution: this.solution }) : [
+                    m(LevelSelector, {
+                        nLevels: this.levels.length,
+                        selectedLevel: this.selectedLevel,
+                        onLevelChanged: this.onLevelChanged
+                    }),
+                    this.solution ? m(SolutionPlayer, { boardSize: this.boardSize, obstacles: this.boardState.obstacles, solution: this.solution, currentStep: this.currentStep, onNextStep: () => this.currentStep++, onPrevStep: () => this.currentStep-- }) : this.selectedLevel === 0 ? [
                         m(BoardSizeEditor, { boardSize: this.boardSize, onSizeChanged: this.onSizeChanged }),
                         this.showBoardEditor ? m(BoardEditor, { boardSize: this.boardSize, boardState: this.boardState, onStateChanged: this.onStateChanged }) : null
-                    ],
-                    this.showBoardEditor && this.stateHistory.length > 0 ? [
+                    ] : null,
+                    this.selectedLevel === 0 && this.showBoardEditor && this.stateHistory.length > 0 ? [
                         m('button#reset', { onclick: () => { this.onSizeChanged(this.boardSize); } }, 'Reset'),
                         m('button#undo', { onclick: this.onUndo }, 'Undo'),
                     ] : null,
-                    this.solution === null && this.showRunButton ? m('button#run', { onclick: this.solve }, 'Solve') : null,
+                    this.selectedLevel === 0 && this.solution === null && this.showRunButton ? m('button#run', { onclick: this.solve }, 'Solve') : null,
                     this.showOverlay ? m('div#overlay', m('div', 'Solving...')) : null,
                     m('p#footer', 'by dvt - 2023')
                 ]
